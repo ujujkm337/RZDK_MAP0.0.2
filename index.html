@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Навигатор РЖДК Уссурийск</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=be0c8369-7476-47a3-a315-59ab429fadcb&lang=ru_RU"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            background: #1a1a1a;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Карта */
+        .map-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Нижняя шторка */
+        .building-sheet {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            transition: bottom 0.4s ease;
+            z-index: 999;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 -5px 25px rgba(0,0,0,0.5);
+        }
+
+        .building-sheet.active {
+            bottom: 0;
+        }
+
+        .sheet-handle {
+            width: 50px;
+            height: 4px;
+            background: #7f8c8d;
+            border-radius: 2px;
+            margin: 0 auto 20px auto;
+        }
+
+        /* Кнопки зданий */
+        .buildings-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 998;
+        }
+
+        .building-btn {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Админка */
+        .admin-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.98);
+            z-index: 1003;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .admin-content {
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+
+        .admin-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .pin-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #34495e;
+            color: white;
+        }
+
+        .file-upload {
+            border: 2px dashed #7f8c8d;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload:hover {
+            border-color: #3498db;
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .buildings-bar {
+                bottom: 10px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                max-width: 90%;
+                padding: 0 10px;
+            }
+            
+            .building-btn {
+                font-size: 14px;
+                padding: 10px 16px;
+            }
+            
+            .admin-content {
+                margin: 10px auto;
+                padding: 15px;
+            }
+        }
+
+        .building-image {
+            width: 100%;
+            height: 200px;
+            background: #34495e;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #bdc3c7;
+            border: 2px dashed #7f8c8d;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 10px;
+            background: #34495e;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background: #3498db;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .group-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .floor-item {
+            background: rgba(255,255,255,0.03);
+            padding: 10px;
+            border-radius: 6px;
+            margin: 5px 0;
+        }
+
+        .coords-display {
+            background: #34495e;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- Админ панель (изначально скрыта) -->
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-content">
+            <h2 style="margin-bottom: 20px;">⚙️ Управление навигатором</h2>
+            
+            <div class="admin-section">
+                <h3>🏫 Управление зданиями</h3>
+                <select id="buildingSelect" class="pin-input" onchange="loadBuildingData()">
+                    <option value="">Выберите здание</option>
+                </select>
+                
+                <input type="text" id="buildingName" class="pin-input" placeholder="Название здания">
+                
+                <div class="coords-display" id="coordsDisplay">
+                    Координаты: не установлены
+                </div>
+                <button class="btn" onclick="startPlacemarkMode()">📍 Установить метку на карте</button>
+                
+                <button class="btn" onclick="saveBuilding()">💾 Сохранить здание</button>
+                <button class="btn btn-success" onclick="addNewBuilding()">➕ Новое здание</button>
+                <button class="btn btn-danger" onclick="deleteBuilding()">🗑️ Удалить здание</button>
+            </div>
+
+            <div class="admin-section" id="buildingDetails" style="display: none;">
+                <h3>📋 Детали здания: <span id="currentBuildingName">—</span></h3>
+                
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('floors')">Этажи</button>
+                    <button class="tab" onclick="switchTab('groups')">Группы</button>
+                </div>
+                
+                <!-- Вкладка Этажи -->
+                <div class="tab-content active" id="floorsTab">
+                    <div id="floorsList">
+                        <!-- Список этажей -->
+                    </div>
+                    <button class="btn btn-success" onclick="addFloor()">➕ Добавить этаж</button>
+                </div>
+                
+                <!-- Вкладка Группы -->
+                <div class="tab-content" id="groupsTab">
+                    <input type="text" id="newGroupName" class="pin-input" placeholder="Название группы">
+                    <button class="btn btn-success" onclick="addGroup()">➕ Добавить группу</button>
+                    
+                    <div id="groupsList">
+                        <!-- Список групп -->
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-danger" onclick="hideAdminPanel()">❌ Закрыть админку</button>
+        </div>
+    </div>
+
+    <!-- Контейнер карты -->
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+
+    <!-- Панель кнопок зданий -->
+    <div class="buildings-bar" id="buildingsBar">
+        <!-- Кнопки будут добавляться через JS -->
+    </div>
+
+    <!-- Шторка с информацией о здании -->
+    <div class="building-sheet" id="buildingSheet">
+        <div class="sheet-handle"></div>
+        <h3 id="sheetBuildingName">Название здания</h3>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchUserTab('floors')">🏢 Этажи</button>
+            <button class="tab" onclick="switchUserTab('schedule')">📅 Расписание</button>
+        </div>
+        
+        <!-- Вкладка Этажи для пользователя -->
+        <div class="tab-content active" id="userFloorsTab">
+            <div id="userFloorsList">
+                <!-- Этажи для пользователя -->
+            </div>
+        </div>
+        
+        <!-- Вкладка Расписание для пользователя -->
+        <div class="tab-content" id="userScheduleTab">
+            <div id="userGroupsList">
+                <!-- Группы для пользователя -->
+            </div>
+        </div>
+        
+        <button class="btn" onclick="closeBuildingSheet()">Закрыть</button>
+    </div>
+
+    <script>
+        const ADMIN_SECRET = "secret";
+        let map;
+        let buildings = [];
+        let currentBuildingId = null;
+        let isAdminMode = false;
+        let placemarkMode = false;
+        let tempPlacemark = null;
+
+        const defaultBuildings = [
+            {
+                id: 1,
+                name: 'Главный корпус',
+                coords: [43.790882, 131.944252],
+                floors: [],
+                groups: []
+            }
+        ];
+
+        function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminParam = urlParams.get('admin');
+            
+            if (adminParam === ADMIN_SECRET) {
+                isAdminMode = true;
+                showAdminPanel();
+            }
+        }
+
+        function initMap() {
+            map = new ymaps.Map('map', {
+                center: [43.790882, 131.944252],
+                zoom: 17,
+                controls: ['zoomControl', 'fullscreenControl']
+            });
+
+            loadBuildings();
+            checkAdminAccess();
+        }
+
+        function loadBuildings() {
+            const saved = localStorage.getItem('rzhdk_buildings');
+            buildings = saved ? JSON.parse(saved) : defaultBuildings;
+            
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+        }
+
+        function saveBuildings() {
+            localStorage.setItem('rzhdk_buildings', JSON.stringify(buildings));
+        }
+
+        function renderBuildings() {
+            map.geoObjects.removeAll();
+            
+            // В режиме админки не показываем метки
+            if (isAdminMode) return;
+            
+            buildings.forEach(building => {
+                const placemark = new ymaps.Placemark(building.coords, {
+                    balloonContent: `<strong>${building.name}</strong>`
+                }, {
+                    preset: 'islands#blueIcon'
+                });
+                
+                placemark.events.add('click', () => {
+                    showBuildingSheet(building);
+                });
+                
+                map.geoObjects.add(placemark);
+            });
+        }
+
+        function renderBuildingButtons() {
+            const bar = document.getElementById('buildingsBar');
+            bar.innerHTML = '';
+            
+            buildings.forEach(building => {
+                const btn = document.createElement('button');
+                btn.className = 'building-btn';
+                btn.textContent = building.name;
+                btn.onclick = () => {
+                    map.setCenter(building.coords, 17);
+                    showBuildingSheet(building);
+                };
+                bar.appendChild(btn);
+            });
+        }
+
+        function updateBuildingSelect() {
+            const select = document.getElementById('buildingSelect');
+            select.innerHTML = '<option value="">Выберите здание</option>';
+            
+            buildings.forEach(building => {
+                const option = document.createElement('option');
+                option.value = building.id;
+                option.textContent = building.name;
+                select.appendChild(option);
+            });
+        }
+
+        function loadBuildingData() {
+            const buildingId = parseInt(document.getElementById('buildingSelect').value);
+            currentBuildingId = buildingId;
+            
+            if (!buildingId) {
+                clearBuildingForm();
+                return;
+            }
+            
+            const building = buildings.find(b => b.id === buildingId);
+            if (building) {
+                document.getElementById('buildingName').value = building.name;
+                document.getElementById('currentBuildingName').textContent = building.name;
+                document.getElementById('coordsDisplay').textContent = `Координаты: ${building.coords[0]}, ${building.coords[1]}`;
+                document.getElementById('buildingDetails').style.display = 'block';
+                
+                renderFloors(building);
+                renderGroups(building);
+            }
+        }
+
+        function clearBuildingForm() {
+            document.getElementById('buildingName').value = '';
+            document.getElementById('currentBuildingName').textContent = '—';
+            document.getElementById('coordsDisplay').textContent = 'Координаты: не установлены';
+            document.getElementById('buildingDetails').style.display = 'none';
+            currentBuildingId = null;
+        }
+
+        function startPlacemarkMode() {
+            if (!currentBuildingId) {
+                alert('Сначала выберите или создайте здание');
+                return;
+            }
+            
+            placemarkMode = true;
+            
+            // Удаляем старую временную метку
+            if (tempPlacemark) {
+                map.geoObjects.remove(tempPlacemark);
+            }
+            
+            // Создаем временную метку
+            tempPlacemark = new ymaps.Placemark(map.getCenter(), {}, {
+                preset: 'islands#redIcon',
+                draggable: true
+            });
+            
+            map.geoObjects.add(tempPlacemark);
+            
+            // Обновляем координаты при перемещении
+            tempPlacemark.events.add('dragend', function() {
+                const coords = tempPlacemark.geometry.getCoordinates();
+                document.getElementById('coordsDisplay').textContent = `Координаты: ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
+            });
+            
+            alert('📍 Переместите метку на нужное место на карте, затем сохраните здание');
+        }
+
+        function addNewBuilding() {
+            const newId = buildings.length > 0 ? Math.max(...buildings.map(b => b.id)) + 1 : 1;
+            currentBuildingId = newId;
+            
+            clearBuildingForm();
+            document.getElementById('buildingName').value = 'Новое здание';
+            document.getElementById('currentBuildingName').textContent = 'Новое здание';
+            document.getElementById('buildingDetails').style.display = 'block';
+            
+            setTimeout(() => {
+                document.getElementById('buildingSelect').value = newId;
+            }, 100);
+        }
+
+        function saveBuilding() {
+            if (!currentBuildingId) {
+                alert('Выберите или создайте здание');
+                return;
+            }
+            
+            let building = buildings.find(b => b.id === currentBuildingId);
+            let coords;
+            
+            // Получаем координаты из временной метки или используем текущие
+            if (tempPlacemark) {
+                coords = tempPlacemark.geometry.getCoordinates();
+                map.geoObjects.remove(tempPlacemark);
+                tempPlacemark = null;
+            } else if (building) {
+                coords = building.coords;
+            } else {
+                coords = map.getCenter();
+            }
+            
+            if (!building) {
+                building = {
+                    id: currentBuildingId,
+                    name: document.getElementById('buildingName').value,
+                    coords: coords,
+                    floors: [],
+                    groups: []
+                };
+                buildings.push(building);
+            } else {
+                building.name = document.getElementById('buildingName').value;
+                building.coords = coords;
+            }
+            
+            document.getElementById('coordsDisplay').textContent = `Координаты: ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
+            
+            saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+            
+            alert('✅ Здание сохранено!');
+            placemarkMode = false;
+        }
+
+        function deleteBuilding() {
+            if (!currentBuildingId) {
+                alert('Выберите здание для удаления');
+                return;
+            }
+            
+            if (!confirm(`Удалить здание "${document.getElementById('buildingName').value}"?`)) {
+                return;
+            }
+            
+            buildings = buildings.filter(b => b.id !== currentBuildingId);
+            saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+            clearBuildingForm();
+            
+            alert('✅ Здание удалено!');
+        }
+
+        function addFloor() {
+            if (!currentBuildingId) return;
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            const floorNumber = building.floors.length + 1;
+            
+            building.floors.push({
+                number: floorNumber,
+                name: `Этаж ${floorNumber}`,
+                plan: null
+            });
+            
+            saveBuildings();
+            renderFloors(building);
+        }
+
+        function renderFloors(building) {
+            const floorsList = document.getElementById('floorsList');
+            floorsList.innerHTML = '';
+            
+            building.floors.forEach((floor, index) => {
+                const floorItem = document.createElement('div');
+                floorItem.className = 'floor-item';
+                floorItem.innerHTML = `
+                    <strong>${floor.name}</strong>
+                    <div style="margin-top: 10px;">
+                        <input type="text" value="${floor.name}" onchange="updateFloorName(${index}, this.value)" class="pin-input" style="font-size: 12px; padding: 8px;">
+                        <div class="file-upload" onclick="document.getElementById('floorPlan${index}').click()">
+                            ${floor.plan ? '✅ План загружен' : '🗺️ Загрузить план этажа'}
+                        </div>
+                        <input type="file" id="floorPlan${index}" style="display: none;" accept="image/*" onchange="uploadFloorPlan(${index}, this.files[0])">
+                        <button class="btn" style="background: #e74c3c; padding: 8px; margin-top: 5px;" onclick="deleteFloor(${index})">❌ Удалить</button>
+                    </div>
+                `;
+                floorsList.appendChild(floorItem);
+            });
+        }
+
+        function updateFloorName(floorIndex, newName) {
+            if (!currentBuildingId) return;
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].name = newName;
+            saveBuildings();
+        }
+
+        function uploadFloorPlan(floorIndex, file) {
+            if (!currentBuildingId) return;
+            
+            if (file && file.size > 5 * 1024 * 1024) {
+                alert('❌ Файл слишком большой! Максимум 5MB');
+                return;
+            }
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const building = buildings.find(b => b.id === currentBuildingId);
+                    building.floors[floorIndex].plan = e.target.result;
+                    saveBuildings();
+                    renderFloors(building);
+                    alert('✅ План этажа загружен!');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function deleteFloor(floorIndex) {
+            if (!currentBuildingId) return;
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors.splice(floorIndex, 1);
+            saveBuildings();
+            renderFloors(building);
+        }
+
+        function addGroup() {
+            if (!currentBuildingId) return;
+            
+            const groupName = document.getElementById('newGroupName').value.trim();
+            if (!groupName) {
+                alert('Введите название группы');
+                return;
+            }
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            
+            building.groups.push({
+                name: groupName,
+                schedule: null
+            });
+            
+            document.getElementById('newGroupName').value = '';
+            saveBuildings();
+            renderGroups(building);
+        }
+
+        function renderGroups(building) {
+            const groupsList = document.getElementById('groupsList');
+            groupsList.innerHTML = '';
+            
+            building.groups.forEach((group, index) => {
+                const groupItem = document.createElement('div');
+                groupItem.className = 'group-item';
+                groupItem.innerHTML = `
+                    <div class="group-header">
+                        <strong>${group.name}</strong>
+                        <button class="btn" style="background: #e74c3c; padding: 5px 10px;" onclick="deleteGroup(${index})">❌</button>
+                    </div>
+                    <div class="file-upload" onclick="document.getElementById('groupSchedule${index}').click()">
+                        ${group.schedule ? '✅ Расписание загружено' : '📅 Загрузить расписание'}
+                    </div>
+                    <input type="file" id="groupSchedule${index}" style="display: none;" accept="image/*" onchange="uploadGroupSchedule(${index}, this.files[0])">
+                `;
+                groupsList.appendChild(groupItem);
+            });
+        }
+
+        function uploadGroupSchedule(groupIndex, file) {
+            if (!currentBuildingId) return;
+            
+            if (file && file.size > 5 * 1024 * 1024) {
+                alert('❌ Файл слишком большой! Максимум 5MB');
+                return;
+            }
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const building = buildings.find(b => b.id === currentBuildingId);
+                    building.groups[groupIndex].schedule = e.target.result;
+                    saveBuildings();
+                    renderGroups(building);
+                    alert('✅ Расписание загружено!');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function deleteGroup(groupIndex) {
+            if (!currentBuildingId) return;
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.groups.splice(groupIndex, 1);
+            saveBuildings();
+            renderGroups(building);
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        function switchUserTab(tabName) {
+            document.querySelectorAll('#buildingSheet .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('#buildingSheet .tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById('user' + tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Tab').classList.add('active');
+        }
+
+        function showBuildingSheet(building) {
+            document.getElementById('sheetBuildingName').textContent = building.name;
+            
+            // Рендерим этажи для пользователя
+            const userFloorsList = document.getElementById('userFloorsList');
+            userFloorsList.innerHTML = '';
+            
+            building.floors.forEach(floor => {
+                const floorItem = document.createElement('div');
+                floorItem.className = 'floor-item';
+                floorItem.innerHTML = `
+                    <strong>${floor.name}</strong>
+                    ${floor.plan ? `
+                        <div class="building-image">
+                            <img src="${floor.plan}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)">
+                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
+                                🔍 Нажми для увеличения
+                            </div>
+                        </div>
+                    ` : '<p style="color: #bdc3c7; margin: 10px 0;">План не загружен</p>'}
+                `;
+                userFloorsList.appendChild(floorItem);
+            });
+            
+            // Рендерим группы для пользователя
+            const userGroupsList = document.getElementById('userGroupsList');
+            userGroupsList.innerHTML = '';
+            
+            building.groups.forEach(group => {
+                const groupItem = document.createElement('div');
+                groupItem.className = 'group-item';
+                groupItem.innerHTML = `
+                    <strong>${group.name}</strong>
+                    ${group.schedule ? `
+                        <div class="building-image">
+                            <img src="${group.schedule}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)">
+                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
+                                🔍 Нажми для увеличения
+                            </div>
+                        </div>
+                    ` : '<p style="color: #bdc3c7; margin: 10px 0;">Расписание не загружено</p>'}
+                `;
+                userGroupsList.appendChild(groupItem);
+            });
+            
+            document.getElementById('buildingSheet').classList.add('active');
+        }
+
+        function toggleImageZoom(img) {
+            if (img.style.transform === 'scale(1.5)') {
+                img.style.transform = 'scale(1)';
+                img.style.cursor = 'zoom-in';
+            } else {
+                img.style.transform = 'scale(1.5)';
+                img.style.cursor = 'zoom-out';
+            }
+        }
+
+        function closeBuildingSheet() {
+            document.getElementById('buildingSheet').classList.remove('active');
+        }
+
+        function showAdminPanel() {
+            document.getElementById('adminPanel').classList.add('active');
+        }
+
+        function hideAdminPanel() {
+            document.getElementById('adminPanel').classList.remove('active');
+            const url = new URL(window.location);
+            url.searchParams.delete('admin');
+            window.history.replaceState({}, '', url);
+            // Перезагружаем здания чтобы скрыть метки
+            loadBuildings();
+        }
+
+        ymaps.ready(initMap);
+    </script>
+</body>
+</html>
