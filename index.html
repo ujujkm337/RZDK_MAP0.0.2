@@ -16,8 +16,7 @@
         body {
             background: #1a1a1a;
             color: white;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
         }
 
         .map-container {
@@ -101,7 +100,7 @@
             background: #2c3e50;
             padding: 20px;
             border-radius: 15px;
-            max-width: 500px;
+            max-width: 600px;
             margin: 20px auto;
         }
 
@@ -113,7 +112,6 @@
         }
 
         .btn {
-            width: 100%;
             padding: 12px;
             background: #3498db;
             color: white;
@@ -129,6 +127,14 @@
 
         .btn-danger {
             background: #e74c3c;
+        }
+
+        .btn-compile {
+            background: #9b59b6;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 15px;
         }
 
         .pin-input {
@@ -219,11 +225,22 @@
             padding: 15px;
             border-radius: 8px;
             margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .group-item.favorite {
+            background: rgba(255,193,7,0.2);
+            border: 2px solid #ffc107;
+        }
+
+        .group-item:hover {
+            background: rgba(255,255,255,0.1);
         }
 
         .group-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
         }
@@ -252,25 +269,34 @@
             font-size: 14px;
         }
 
-        .sync-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #2c3e50;
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 1000;
+        .schedule-scroll {
+            overflow-x: auto;
+            white-space: nowrap;
+            padding: 10px 0;
+        }
+
+        .schedule-image {
+            height: 300px;
+            display: inline-block;
+            margin-right: 10px;
+            border-radius: 8px;
+        }
+
+        .favorite-star {
+            color: #ffc107;
+            font-size: 20px;
+        }
+
+        .compile-section {
+            background: rgba(155, 89, 182, 0.2);
+            border: 2px dashed #9b59b6;
         }
     </style>
 </head>
 <body>
-    <div class="sync-status" id="syncStatus">🔄 Синхронизация...</div>
-
-    <!-- Админ панель (изначально скрыта) -->
-    <div class="admin-panel" id="adminPanel">
+    <div class="admin-panel active" id="adminPanel">
         <div class="admin-content">
-            <h2 style="margin-bottom: 20px;">⚙️ Управление навигатором</h2>
+            <h2 style="margin-bottom: 20px;">⚙️ Офлайн-редактор навигатора</h2>
             
             <div class="admin-section">
                 <h3>🏫 Управление зданиями</h3>
@@ -281,7 +307,7 @@
                 <input type="text" id="buildingName" class="pin-input" placeholder="Название здания">
                 
                 <div class="coords-display" id="coordsDisplay">
-                    Координаты: не установлены
+                    Координаты: 43.790882, 131.944252
                 </div>
                 <button class="btn" onclick="startPlacemarkMode()">📍 Установить метку на карте</button>
                 
@@ -290,48 +316,51 @@
                 <button class="btn btn-danger" onclick="deleteBuilding()">🗑️ Удалить здание</button>
             </div>
 
-            <div class="admin-section" id="buildingDetails" style="display: none;">
-                <h3>📋 Детали здания: <span id="currentBuildingName">—</span></h3>
+            <div class="admin-section" id="buildingDetails">
+                <h3>📋 Детали здания: <span id="currentBuildingName">Главный корпус</span></h3>
                 
                 <div class="tabs">
                     <button class="tab active" onclick="switchTab('floors')">Этажи</button>
                     <button class="tab" onclick="switchTab('groups')">Группы</button>
                 </div>
                 
-                <!-- Вкладка Этажи -->
                 <div class="tab-content active" id="floorsTab">
                     <div id="floorsList">
-                        <!-- Список этажей -->
+                        <!-- Этажи будут здесь -->
                     </div>
                     <button class="btn btn-success" onclick="addFloor()">➕ Добавить этаж</button>
                 </div>
                 
-                <!-- Вкладка Группы -->
                 <div class="tab-content" id="groupsTab">
                     <input type="text" id="newGroupName" class="pin-input" placeholder="Название группы">
                     <button class="btn btn-success" onclick="addGroup()">➕ Добавить группу</button>
                     
                     <div id="groupsList">
-                        <!-- Список групп -->
+                        <!-- Группы будут здесь -->
                     </div>
                 </div>
             </div>
 
-            <button class="btn btn-danger" onclick="hideAdminPanel()">❌ Закрыть админку</button>
+            <div class="admin-section compile-section">
+                <h3>🔧 Компиляция</h3>
+                <p style="margin-bottom: 15px; color: #bdc3c7;">
+                    После настройки всех зданий нажмите кнопку ниже чтобы создать готовый файл для GitHub Pages
+                </p>
+                <button class="btn btn-compile" onclick="compileProject()">🚀 СКОМПИЛИРОВАТЬ ПРОЕКТ</button>
+            </div>
+
+            <button class="btn btn-danger" onclick="hideAdminPanel()">👀 Предпросмотр</button>
         </div>
     </div>
 
-    <!-- Контейнер карты -->
-    <div class="map-container">
+    <div class="map-container" style="display: none;" id="previewContainer">
         <div id="map"></div>
     </div>
 
-    <!-- Панель кнопок зданий -->
-    <div class="buildings-bar" id="buildingsBar">
-        <!-- Кнопки будут добавляться через JS -->
+    <div class="buildings-bar" id="buildingsBar" style="display: none;">
+        <!-- Кнопки зданий -->
     </div>
 
-    <!-- Шторка с информацией о здании -->
     <div class="building-sheet" id="buildingSheet">
         <div class="sheet-handle"></div>
         <h3 id="sheetBuildingName">Название здания</h3>
@@ -341,14 +370,12 @@
             <button class="tab" onclick="switchUserTab('schedule')">📅 Расписание</button>
         </div>
         
-        <!-- Вкладка Этажи для пользователя -->
         <div class="tab-content active" id="userFloorsTab">
             <div id="userFloorsList">
                 <!-- Этажи для пользователя -->
             </div>
         </div>
         
-        <!-- Вкладка Расписание для пользователя -->
         <div class="tab-content" id="userScheduleTab">
             <div id="userGroupsList">
                 <!-- Группы для пользователя -->
@@ -359,166 +386,63 @@
     </div>
 
     <script>
-        const ADMIN_SECRET = "secret";
-        // Базовый URL для файлов на GitHub
-        const CDN_BASE_URL = "https://ujujkm337.github.io/RZDK_MAP0.0.2/files";
-        // URL для данных (файл в вашем репозитории)
-        const DATA_FILE_URL = "https://ujujkm337.github.io/RZDK_MAP0.0.2/data.json";
-        
+        // Списки файлов как ты указал - ВСЕ КАРТИНКИ БУДУТ В ПАПКЕ files/
+        const FLOOR_PLANS = ["1.jpg", "2.jpg", "3.jpg"];
+        const ROOM_PLANS = [
+            "111.jpg", "211.jpg", "212.jpg", "311.jpg", "312.jpg", "411.jpg", 
+            "611.jpg", "811.jpg", "812.jpg", "911.jpg", "1011.jpg", "1111.jpg",
+            "121.jpg", "321.jpg", "421.jpg", "621.jpg", "921.jpg", "1021.jpg", 
+            "1121.jpg", "131.jpg", "231.jpg", "241.jpg", "741.jpg"
+        ];
+
         let map;
         let buildings = [];
         let currentBuildingId = null;
-        let isAdminMode = false;
         let placemarkMode = false;
         let tempPlacemark = null;
+        let userFavorites = JSON.parse(localStorage.getItem('userFavorites')) || [];
 
-        // Список доступных файлов на GitHub
-        const availableFiles = {
-            floorPlans: [
-                "1floor.jpg",
-                "2floor.jpg", 
-                "3floor.jpg",
-                "main_building.jpg"
-            ],
-            schedules: [
-                "group1_schedule.jpg",
-                "group2_schedule.jpg",
-                "music_schedule.jpg",
-                "dance_schedule.jpg",
-                "raspisanie.jpg"
-            ]
-        };
-
-        const defaultBuildings = [
-            {
-                id: 1,
-                name: 'Главный корпус',
-                coords: [43.790882, 131.944252],
-                floors: [],
-                groups: []
-            }
-        ];
-
-        // Простая синхронизация через GitHub - только чтение
-        async function loadBuildingsFromGitHub() {
-            try {
-                // Добавляем timestamp чтобы избежать кеширования
-                const response = await fetch(DATA_FILE_URL + '?t=' + Date.now());
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    buildings = data.buildings || defaultBuildings;
-                    updateSyncStatus('✅ Данные загружены', 'success');
-                    return true;
-                } else {
-                    throw new Error('Ошибка загрузки');
-                }
-            } catch (error) {
-                console.error('Ошибка загрузки с GitHub:', error);
-                // Загружаем из localStorage как резервный вариант
-                const saved = localStorage.getItem('rzhdk_buildings');
-                buildings = saved ? JSON.parse(saved) : defaultBuildings;
-                updateSyncStatus('⚠️ Используются локальные данные', 'warning');
-                return false;
-            }
-        }
-
-        function updateSyncStatus(message, type) {
-            const statusEl = document.getElementById('syncStatus');
-            statusEl.textContent = message;
-            
-            if (type === 'success') {
-                statusEl.style.background = '#27ae60';
-            } else if (type === 'error') {
-                statusEl.style.background = '#e74c3c';
-            } else if (type === 'warning') {
-                statusEl.style.background = '#f39c12';
+        // Загружаем данные
+        function loadBuildings() {
+            const saved = localStorage.getItem('rzhdk_buildings');
+            if (saved) {
+                buildings = JSON.parse(saved);
+            } else {
+                // Создаем начальное здание
+                buildings = [{
+                    id: 1,
+                    name: 'Главный корпус',
+                    coords: [43.790882, 131.944252],
+                    floors: [],
+                    groups: []
+                }];
+                saveBuildings();
             }
             
-            setTimeout(() => {
-                statusEl.style.background = '#2c3e50';
-                statusEl.textContent = '✅ Синхронизировано';
-            }, 3000);
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+            loadBuildingData();
         }
 
-        function checkAdminAccess() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const adminParam = urlParams.get('admin');
-            
-            if (adminParam === ADMIN_SECRET) {
-                isAdminMode = true;
-                showAdminPanel();
-            }
+        function saveBuildings() {
+            localStorage.setItem('rzhdk_buildings', JSON.stringify(buildings));
         }
 
-        async function initMap() {
+        function initMap() {
             map = new ymaps.Map('map', {
                 center: [43.790882, 131.944252],
                 zoom: 17,
                 controls: ['zoomControl', 'fullscreenControl']
             });
 
-            await loadBuildings();
-            checkAdminAccess();
-            
-            // Автоматическая синхронизация каждые 30 секунд
-            setInterval(loadBuildings, 30000);
-        }
-
-        async function loadBuildings() {
-            await loadBuildingsFromGitHub();
-            renderBuildings();
-            renderBuildingButtons();
-            updateBuildingSelect();
-        }
-
-        function saveBuildings() {
-            // Сохраняем только локально
-            localStorage.setItem('rzhdk_buildings', JSON.stringify(buildings));
-            updateSyncStatus('💾 Сохранено локально', 'success');
-            
-            // Показываем инструкцию для ручного обновления на GitHub
-            if (isAdminMode) {
-                showGitHubInstructions();
-            }
-        }
-
-        function showGitHubInstructions() {
-            const dataStr = JSON.stringify({ buildings: buildings }, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const instruction = `
-📋 **ИНСТРУКЦИЯ ДЛЯ АДМИНА:**
-
-1. 📥 **Скачайте обновленные данные:**
-   <a href="${url}" download="data.json" style="color: #3498db;">Скачать data.json</a>
-
-2. 📁 **Загрузите в репозиторий GitHub:**
-   - Перейдите в ваш репозиторий на GitHub
-   - Нажмите "Add file" → "Upload files"
-   - Загрузите скачанный файл data.json
-   - Напишите комментарий коммита (например: "Обновление данных")
-   - Нажмите "Commit changes"
-
-3. 🔄 **Данные обновятся у всех пользователей через 30 секунд**
-
-💡 *Для автоматизации можно использовать GitHub Desktop или Git команды*
-            `;
-            
-            // Показываем инструкцию один раз при первом сохранении
-            if (!localStorage.getItem('instruction_shown')) {
-                setTimeout(() => {
-                    alert(instruction);
-                    localStorage.setItem('instruction_shown', 'true');
-                }, 1000);
-            }
+            loadBuildings();
         }
 
         function renderBuildings() {
-            map.geoObjects.removeAll();
+            if (!map) return;
             
-            if (isAdminMode) return;
+            map.geoObjects.removeAll();
             
             buildings.forEach(building => {
                 const placemark = new ymaps.Placemark(building.coords, {
@@ -561,6 +485,10 @@
                 option.textContent = building.name;
                 select.appendChild(option);
             });
+            
+            if (buildings.length > 0) {
+                select.value = buildings[0].id;
+            }
         }
 
         function loadBuildingData() {
@@ -577,7 +505,6 @@
                 document.getElementById('buildingName').value = building.name;
                 document.getElementById('currentBuildingName').textContent = building.name;
                 document.getElementById('coordsDisplay').textContent = `Координаты: ${building.coords[0]}, ${building.coords[1]}`;
-                document.getElementById('buildingDetails').style.display = 'block';
                 
                 renderFloors(building);
                 renderGroups(building);
@@ -588,7 +515,6 @@
             document.getElementById('buildingName').value = '';
             document.getElementById('currentBuildingName').textContent = '—';
             document.getElementById('coordsDisplay').textContent = 'Координаты: не установлены';
-            document.getElementById('buildingDetails').style.display = 'none';
             currentBuildingId = null;
         }
 
@@ -635,7 +561,6 @@
             document.getElementById('buildingName').value = newBuilding.name;
             document.getElementById('currentBuildingName').textContent = newBuilding.name;
             document.getElementById('coordsDisplay').textContent = `Координаты: ${newBuilding.coords[0].toFixed(6)}, ${newBuilding.coords[1].toFixed(6)}`;
-            document.getElementById('buildingDetails').style.display = 'block';
             
             updateBuildingSelect();
             document.getElementById('buildingSelect').value = newId;
@@ -673,8 +598,11 @@
             document.getElementById('coordsDisplay').textContent = `Координаты: ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
             
             saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
             
-            alert('✅ Здание сохранено! Не забудьте обновить данные на GitHub.');
+            alert('✅ Здание сохранено!');
             placemarkMode = false;
         }
 
@@ -690,10 +618,12 @@
             
             buildings = buildings.filter(b => b.id !== currentBuildingId);
             saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
             updateBuildingSelect();
             clearBuildingForm();
             
-            alert('✅ Здание удалено! Не забудьте обновить данные на GitHub.');
+            alert('✅ Здание удалено!');
         }
 
         function addFloor() {
@@ -705,7 +635,8 @@
             building.floors.push({
                 number: floorNumber,
                 name: `Этаж ${floorNumber}`,
-                planFile: null
+                planFile: null,
+                rooms: []
             });
             
             saveBuildings();
@@ -720,24 +651,50 @@
                 const floorItem = document.createElement('div');
                 floorItem.className = 'floor-item';
                 
-                const selectOptions = availableFiles.floorPlans.map(file => 
+                const floorOptions = FLOOR_PLANS.map(file => 
                     `<option value="${file}" ${floor.planFile === file ? 'selected' : ''}>${file}</option>`
                 ).join('');
+                
+                const roomOptions = ROOM_PLANS.map(file => 
+                    `<option value="${file}">${file}</option>`
+                ).join('');
+                
+                const roomsHTML = floor.rooms.map((room, roomIndex) => `
+                    <div style="display: flex; gap: 10px; margin: 5px 0; align-items: center;">
+                        <input type="text" value="${room.name}" placeholder="Название кабинета" 
+                               onchange="updateRoomName(${index}, ${roomIndex}, this.value)" 
+                               style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #34495e; background: #2c3e50; color: white;">
+                        <select onchange="updateRoomPlan(${index}, ${roomIndex}, this.value)" 
+                                style="padding: 8px; border-radius: 4px; border: 1px solid #34495e; background: #2c3e50; color: white;">
+                            <option value="">Выберите план</option>
+                            ${roomOptions}
+                        </select>
+                        <button onclick="deleteRoom(${index}, ${roomIndex})" style="background: #e74c3c; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer;">❌</button>
+                    </div>
+                `).join('');
                 
                 floorItem.innerHTML = `
                     <strong>${floor.name}</strong>
                     <div style="margin-top: 10px;">
-                        <input type="text" value="${floor.name}" onchange="updateFloorName(${index}, this.value)" class="pin-input" style="font-size: 12px; padding: 8px;">
+                        <input type="text" value="${floor.name}" onchange="updateFloorName(${index}, this.value)" 
+                               class="pin-input" style="font-size: 12px; padding: 8px;">
+                        
                         <select class="file-select" onchange="updateFloorPlan(${index}, this.value)">
                             <option value="">-- Выберите план этажа --</option>
-                            ${selectOptions}
+                            ${floorOptions}
                         </select>
-                        ${floor.planFile ? `
-                            <div class="file-info">
-                                ✅ Выбран файл: ${floor.planFile}
-                            </div>
-                        ` : ''}
-                        <button class="btn" style="background: #e74c3c; padding: 8px; margin-top: 5px;" onclick="deleteFloor(${index})">❌ Удалить этаж</button>
+                        
+                        ${floor.planFile ? `<div class="file-info">✅ Выбран файл: ${floor.planFile}</div>` : ''}
+                        
+                        <div style="margin: 15px 0;">
+                            <strong>Кабинеты на этаже:</strong>
+                            ${roomsHTML}
+                            <button class="btn" style="background: #f39c12; padding: 8px; margin-top: 10px;" 
+                                    onclick="addRoom(${index})">➕ Добавить кабинет</button>
+                        </div>
+                        
+                        <button class="btn" style="background: #e74c3c; padding: 8px; margin-top: 5px;" 
+                                onclick="deleteFloor(${index})">❌ Удалить этаж</button>
                     </div>
                 `;
                 floorsList.appendChild(floorItem);
@@ -746,7 +703,6 @@
 
         function updateFloorName(floorIndex, newName) {
             if (!currentBuildingId) return;
-            
             const building = buildings.find(b => b.id === currentBuildingId);
             building.floors[floorIndex].name = newName;
             saveBuildings();
@@ -754,20 +710,47 @@
 
         function updateFloorPlan(floorIndex, fileName) {
             if (!currentBuildingId) return;
-            
             const building = buildings.find(b => b.id === currentBuildingId);
             building.floors[floorIndex].planFile = fileName || null;
             saveBuildings();
             renderFloors(building);
-            
-            if (fileName) {
-                alert('✅ План этажа установлен!');
-            }
+        }
+
+        function addRoom(floorIndex) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].rooms.push({
+                name: 'Новый кабинет',
+                planFile: null
+            });
+            saveBuildings();
+            renderFloors(building);
+        }
+
+        function updateRoomName(floorIndex, roomIndex, newName) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].rooms[roomIndex].name = newName;
+            saveBuildings();
+        }
+
+        function updateRoomPlan(floorIndex, roomIndex, fileName) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].rooms[roomIndex].planFile = fileName || null;
+            saveBuildings();
+        }
+
+        function deleteRoom(floorIndex, roomIndex) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].rooms.splice(roomIndex, 1);
+            saveBuildings();
+            renderFloors(building);
         }
 
         function deleteFloor(floorIndex) {
             if (!currentBuildingId) return;
-            
             const building = buildings.find(b => b.id === currentBuildingId);
             building.floors.splice(floorIndex, 1);
             saveBuildings();
@@ -787,7 +770,7 @@
             
             building.groups.push({
                 name: groupName,
-                scheduleFile: null
+                scheduleFiles: []
             });
             
             document.getElementById('newGroupName').value = '';
@@ -803,45 +786,63 @@
                 const groupItem = document.createElement('div');
                 groupItem.className = 'group-item';
                 
-                const selectOptions = availableFiles.schedules.map(file => 
-                    `<option value="${file}" ${group.scheduleFile === file ? 'selected' : ''}>${file}</option>`
+                const scheduleOptions = ROOM_PLANS.map(file => 
+                    `<option value="${file}">${file}</option>`
                 ).join('');
+                
+                const schedulesHTML = group.scheduleFiles.map((file, fileIndex) => `
+                    <div style="display: flex; gap: 10px; margin: 5px 0; align-items: center;">
+                        <select onchange="updateGroupSchedule(${index}, ${fileIndex}, this.value)" 
+                                style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #34495e; background: #2c3e50; color: white;">
+                            <option value="">Выберите расписание</option>
+                            ${scheduleOptions}
+                        </select>
+                        <button onclick="deleteGroupSchedule(${index}, ${fileIndex})" style="background: #e74c3c; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer;">❌</button>
+                    </div>
+                `).join('');
                 
                 groupItem.innerHTML = `
                     <div class="group-header">
                         <strong>${group.name}</strong>
                         <button class="btn" style="background: #e74c3c; padding: 5px 10px;" onclick="deleteGroup(${index})">❌</button>
                     </div>
-                    <select class="file-select" onchange="updateGroupSchedule(${index}, this.value)">
-                        <option value="">-- Выберите расписание --</option>
-                        ${selectOptions}
-                    </select>
-                    ${group.scheduleFile ? `
-                        <div class="file-info">
-                            ✅ Выбран файл: ${group.scheduleFile}
-                        </div>
-                    ` : ''}
+                    
+                    <div style="margin: 10px 0;">
+                        <strong>Расписания группы:</strong>
+                        ${schedulesHTML}
+                        <button class="btn" style="background: #f39c12; padding: 8px; margin-top: 10px;" 
+                                onclick="addGroupSchedule(${index})">➕ Добавить расписание</button>
+                    </div>
                 `;
                 groupsList.appendChild(groupItem);
             });
         }
 
-        function updateGroupSchedule(groupIndex, fileName) {
+        function addGroupSchedule(groupIndex) {
             if (!currentBuildingId) return;
-            
             const building = buildings.find(b => b.id === currentBuildingId);
-            building.groups[groupIndex].scheduleFile = fileName || null;
+            building.groups[groupIndex].scheduleFiles.push('');
             saveBuildings();
             renderGroups(building);
-            
-            if (fileName) {
-                alert('✅ Расписание установлено!');
-            }
+        }
+
+        function updateGroupSchedule(groupIndex, fileIndex, fileName) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.groups[groupIndex].scheduleFiles[fileIndex] = fileName;
+            saveBuildings();
+        }
+
+        function deleteGroupSchedule(groupIndex, fileIndex) {
+            if (!currentBuildingId) return;
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.groups[groupIndex].scheduleFiles.splice(fileIndex, 1);
+            saveBuildings();
+            renderGroups(building);
         }
 
         function deleteGroup(groupIndex) {
             if (!currentBuildingId) return;
-            
             const building = buildings.find(b => b.id === currentBuildingId);
             building.groups.splice(groupIndex, 1);
             saveBuildings();
@@ -867,6 +868,7 @@
         function showBuildingSheet(building) {
             document.getElementById('sheetBuildingName').textContent = building.name;
             
+            // Рендерим этажи
             const userFloorsList = document.getElementById('userFloorsList');
             userFloorsList.innerHTML = '';
             
@@ -877,37 +879,82 @@
                     <strong>${floor.name}</strong>
                     ${floor.planFile ? `
                         <div class="building-image">
-                            <img src="${CDN_BASE_URL}${floor.planFile}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="План ${floor.name}">
+                            <img src="files/${floor.planFile}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="План ${floor.name}">
                             <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
                                 🔍 Нажми для увеличения
                             </div>
                         </div>
                     ` : '<p style="color: #bdc3c7; margin: 10px 0;">План не загружен</p>'}
+                    
+                    ${floor.rooms.map(room => `
+                        <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 6px;">
+                            <strong>${room.name}</strong>
+                            ${room.planFile ? `
+                                <div class="building-image">
+                                    <img src="files/${room.planFile}" style="width: 100%; height: 150px; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="План ${room.name}">
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
                 `;
                 userFloorsList.appendChild(floorItem);
             });
             
+            // Рендерим группы с избранными
             const userGroupsList = document.getElementById('userGroupsList');
             userGroupsList.innerHTML = '';
             
-            building.groups.forEach(group => {
+            // Сначала избранные
+            const favoriteGroups = building.groups.filter(group => 
+                userFavorites.includes(group.name)
+            );
+            
+            // Потом остальные
+            const otherGroups = building.groups.filter(group => 
+                !userFavorites.includes(group.name)
+            );
+            
+            const sortedGroups = [...favoriteGroups, ...otherGroups];
+            
+            sortedGroups.forEach(group => {
                 const groupItem = document.createElement('div');
-                groupItem.className = 'group-item';
+                groupItem.className = `group-item ${userFavorites.includes(group.name) ? 'favorite' : ''}`;
+                
                 groupItem.innerHTML = `
-                    <strong>${group.name}</strong>
-                    ${group.scheduleFile ? `
-                        <div class="building-image">
-                            <img src="${CDN_BASE_URL}${group.scheduleFile}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="Расписание ${group.name}">
-                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
-                                🔍 Нажми для увеличения
-                            </div>
+                    <div class="group-header">
+                        <strong>${group.name}</strong>
+                        ${userFavorites.includes(group.name) ? '<span class="favorite-star">⭐</span>' : ''}
+                    </div>
+                    ${group.scheduleFiles.length > 0 ? `
+                        <div class="schedule-scroll">
+                            ${group.scheduleFiles.map(file => `
+                                <img src="files/${file}" class="schedule-image" alt="Расписание ${group.name}">
+                            `).join('')}
                         </div>
                     ` : '<p style="color: #bdc3c7; margin: 10px 0;">Расписание не загружено</p>'}
                 `;
+                
+                // Двойной клик для избранного
+                groupItem.ondblclick = () => toggleFavorite(group.name);
                 userGroupsList.appendChild(groupItem);
             });
             
             document.getElementById('buildingSheet').classList.add('active');
+        }
+
+        function toggleFavorite(groupName) {
+            if (userFavorites.includes(groupName)) {
+                userFavorites = userFavorites.filter(name => name !== groupName);
+            } else {
+                userFavorites.push(groupName);
+            }
+            localStorage.setItem('userFavorites', JSON.stringify(userFavorites));
+            
+            // Обновляем отображение
+            const currentBuilding = buildings.find(b => b.id === currentBuildingId);
+            if (currentBuilding) {
+                showBuildingSheet(currentBuilding);
+            }
         }
 
         function toggleImageZoom(img) {
@@ -924,18 +971,42 @@
             document.getElementById('buildingSheet').classList.remove('active');
         }
 
-        function showAdminPanel() {
-            document.getElementById('adminPanel').classList.add('active');
-        }
-
         function hideAdminPanel() {
-            document.getElementById('adminPanel').classList.remove('active');
-            const url = new URL(window.location);
-            url.searchParams.delete('admin');
-            window.history.replaceState({}, '', url);
-            loadBuildings();
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('previewContainer').style.display = 'block';
+            document.getElementById('buildingsBar').style.display = 'flex';
+            renderBuildings();
         }
 
+        function showAdminPanel() {
+            document.getElementById('adminPanel').style.display = 'block';
+            document.getElementById('previewContainer').style.display = 'none';
+            document.getElementById('buildingsBar').style.display = 'none';
+        }
+
+        function compileProject() {
+            const projectData = {
+                buildings: buildings,
+                files: {
+                    floorPlans: FLOOR_PLANS,
+                    roomPlans: ROOM_PLANS
+                },
+                compileDate: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(projectData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'rzhdk_data.json';
+            link.click();
+            
+            alert('✅ Проект скомпилирован! Файл "rzhdk_data.json" скачан.\n\nТеперь загрузите его в ваш репозиторий на GitHub вместе с папкой files/ и всеми картинками.');
+        }
+
+        // Инициализация
         ymaps.ready(initMap);
     </script>
 </body>
