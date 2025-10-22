@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Навигатор РЖДК Уссурийск</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=be0c8369-7476-47a3-a315-59ab429fadcb&lang=ru_RU"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        body {
+            background: #1a1a1a;
+            color: white;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Карта */
+        .map-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Нижняя шторка */
+        .building-sheet {
+            position: fixed;
+            bottom: -100%;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            transition: bottom 0.4s ease;
+            z-index: 999;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 -5px 25px rgba(0,0,0,0.5);
+        }
+
+        .building-sheet.active {
+            bottom: 0;
+        }
+
+        .sheet-handle {
+            width: 50px;
+            height: 4px;
+            background: #7f8c8d;
+            border-radius: 2px;
+            margin: 0 auto 20px auto;
+        }
+
+        /* Кнопки зданий */
+        .buildings-bar {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 998;
+        }
+
+        .building-btn {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Админка */
+        .admin-panel {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.98);
+            z-index: 1003;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .admin-content {
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 15px;
+            max-width: 500px;
+            margin: 20px auto;
+        }
+
+        .admin-section {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px 0;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .pin-input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #34495e;
+            color: white;
+        }
+
+        .file-upload {
+            border: 2px dashed #7f8c8d;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload:hover {
+            border-color: #3498db;
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        /* Мобильная адаптация */
+        @media (max-width: 768px) {
+            .buildings-bar {
+                bottom: 10px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                max-width: 90%;
+                padding: 0 10px;
+            }
+            
+            .building-btn {
+                font-size: 14px;
+                padding: 10px 16px;
+            }
+            
+            .admin-content {
+                margin: 10px auto;
+                padding: 15px;
+            }
+        }
+
+        .building-image {
+            width: 100%;
+            height: 200px;
+            background: #34495e;
+            border-radius: 10px;
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #bdc3c7;
+            border: 2px dashed #7f8c8d;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .admin-instruction {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .admin-instruction code {
+            background: #2c3e50;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #3498db;
+        }
+    </style>
+</head>
+<body>
+    <!-- Админ панель (изначально скрыта) -->
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-content">
+            <h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                ⚙️ Скрытая панель управления
+            </h2>
+            
+            <div class="admin-instruction">
+                <strong>🔒 Секретный доступ:</strong><br>
+                Добавь в URL: <code>?admin=secret</code>
+            </div>
+            
+            <div class="admin-section">
+                <h3>🏫 Управление зданиями</h3>
+                <select id="buildingSelect" class="pin-input" onchange="loadBuildingData()">
+                    <option value="">Выберите здание</option>
+                </select>
+                
+                <input type="text" id="buildingName" class="pin-input" placeholder="Название здания">
+                <input type="text" id="buildingAddress" class="pin-input" placeholder="Адрес">
+                <input type="text" id="buildingPhone" class="pin-input" placeholder="Телефон">
+                
+                <button class="btn" onclick="saveBuilding()">💾 Сохранить здание</button>
+                <button class="btn btn-success" onclick="addNewBuilding()">➕ Новое здание</button>
+                <button class="btn btn-danger" onclick="deleteBuilding()">🗑️ Удалить здание</button>
+            </div>
+
+            <div class="admin-section">
+                <h3>📁 Загрузка файлов</h3>
+                
+                <div style="margin-bottom: 15px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                    <strong>Текущее здание:</strong>
+                    <span id="currentBuildingName" style="color: #3498db;">—</span>
+                </div>
+                
+                <div class="file-upload" onclick="document.getElementById('planUpload').click()">
+                    🗺️ Загрузить план кабинетов
+                    <br>
+                    <small>JPG, PNG (макс. 5MB)</small>
+                </div>
+                <input type="file" id="planUpload" style="display: none;" accept="image/*" onchange="uploadPlan(this.files[0])">
+                
+                <div style="margin: 10px 0;">
+                    <button class="btn" style="background: #e74c3c; padding: 8px;" onclick="clearPlan()">
+                        ❌ Удалить план
+                    </button>
+                </div>
+                
+                <div class="file-upload" onclick="document.getElementById('scheduleUpload').click()">
+                    📅 Загрузить расписание
+                    <br>
+                    <small>JPG, PNG (макс. 5MB)</small>
+                </div>
+                <input type="file" id="scheduleUpload" style="display: none;" accept="image/*" onchange="uploadSchedule(this.files[0])">
+                
+                <div style="margin: 10px 0;">
+                    <button class="btn" style="background: #e74c3c; padding: 8px;" onclick="clearSchedule()">
+                        ❌ Удалить расписание
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>💾 Резервная копия</h3>
+                <button class="btn btn-success" onclick="exportData()">📥 Экспорт данных</button>
+                <button class="btn" onclick="importData()">📤 Импорт данных</button>
+                <input type="file" id="importFile" style="display: none;" accept=".json" onchange="handleImport(this.files[0])">
+                <button class="btn btn-danger" onclick="resetData()">🔄 Сбросить все данные</button>
+            </div>
+
+            <button class="btn btn-danger" onclick="hideAdminPanel()">❌ Закрыть админку</button>
+        </div>
+    </div>
+
+    <!-- Контейнер карты -->
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+
+    <!-- Панель кнопок зданий -->
+    <div class="buildings-bar" id="buildingsBar">
+        <!-- Кнопки будут добавляться через JS -->
+    </div>
+
+    <!-- Шторка с информацией о здании -->
+    <div class="building-sheet" id="buildingSheet">
+        <div class="sheet-handle"></div>
+        <h3 id="sheetBuildingName">Название здания</h3>
+        <p id="sheetBuildingAddress" style="color: #bdc3c7; margin: 10px 0;"></p>
+        <p id="sheetBuildingPhone" style="color: #bdc3c7; margin: 10px 0;"></p>
+        
+        <div class="building-image" id="sheetBuildingPlan">
+            🗺️ План кабинетов не загружен
+        </div>
+        
+        <div class="building-image" id="sheetBuildingSchedule">
+            📅 Расписание не загружено
+        </div>
+        
+        <button class="btn" onclick="closeBuildingSheet()">Закрыть</button>
+    </div>
+
+    <script>
+        // Секретный ключ для доступа к админке
+        const ADMIN_SECRET = "secret";
+        let map;
+        let buildings = [];
+        let currentBuildingId = null;
+        let isAdminMode = false;
+
+        // Данные зданий по умолчанию
+        const defaultBuildings = [
+            {
+                id: 1,
+                name: 'Главный корпус',
+                address: 'ул. Горького, 15',
+                phone: '+7 (4234) 12-34-56',
+                coords: [43.790882, 131.944252],
+                schedule: null,
+                plan: null
+            },
+            {
+                id: 2, 
+                name: 'Общежитие №1',
+                address: 'ул. Ленина, 42',
+                phone: '+7 (4234) 12-34-57',
+                coords: [43.791500, 131.945000],
+                schedule: null,
+                plan: null
+            },
+            {
+                id: 3,
+                name: 'Спортивный комплекс',
+                address: 'ул. Спортивная, 5',
+                phone: '+7 (4234) 12-34-58',
+                coords: [43.789800, 131.943500],
+                schedule: null,
+                plan: null
+            }
+        ];
+
+        // Проверка секретного доступа из URL
+        function checkAdminAccess() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const adminParam = urlParams.get('admin');
+            
+            if (adminParam === ADMIN_SECRET) {
+                isAdminMode = true;
+                showAdminPanel();
+            }
+        }
+
+        // Инициализация карты
+        function initMap() {
+            map = new ymaps.Map('map', {
+                center: [43.790882, 131.944252],
+                zoom: 17,
+                controls: ['zoomControl', 'fullscreenControl']
+            });
+
+            loadBuildings();
+            checkAdminAccess(); // Проверяем доступ при загрузке
+        }
+
+        // Загрузка зданий
+        function loadBuildings() {
+            const saved = localStorage.getItem('rzhdk_buildings');
+            buildings = saved ? JSON.parse(saved) : defaultBuildings;
+            
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+        }
+
+        // Сохранение зданий
+        function saveBuildings() {
+            localStorage.setItem('rzhdk_buildings', JSON.stringify(buildings));
+        }
+
+        // Отрисовка зданий на карте
+        function renderBuildings() {
+            map.geoObjects.removeAll();
+            
+            buildings.forEach(building => {
+                const placemark = new ymaps.Placemark(building.coords, {
+                    balloonContent: `
+                        <strong>${building.name}</strong><br>
+                        ${building.address}<br>
+                        📞 ${building.phone}
+                    `
+                }, {
+                    preset: 'islands#blueIcon'
+                });
+                
+                placemark.events.add('click', () => {
+                    showBuildingSheet(building);
+                });
+                
+                map.geoObjects.add(placemark);
+            });
+        }
+
+        // Отрисовка кнопок зданий
+        function renderBuildingButtons() {
+            const bar = document.getElementById('buildingsBar');
+            bar.innerHTML = '';
+            
+            buildings.forEach(building => {
+                const btn = document.createElement('button');
+                btn.className = 'building-btn';
+                btn.textContent = building.name;
+                btn.onclick = () => {
+                    map.setCenter(building.coords, 17);
+                    showBuildingSheet(building);
+                };
+                bar.appendChild(btn);
+            });
+        }
+
+        // Обновить селектор в админке
+        function updateBuildingSelect() {
+            const select = document.getElementById('buildingSelect');
+            select.innerHTML = '<option value="">Выберите здание</option>';
+            
+            buildings.forEach(building => {
+                const option = document.createElement('option');
+                option.value = building.id;
+                option.textContent = building.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Загрузить данные здания в админку
+        function loadBuildingData() {
+            const buildingId = parseInt(document.getElementById('buildingSelect').value);
+            currentBuildingId = buildingId;
+            
+            if (!buildingId) {
+                clearBuildingForm();
+                return;
+            }
+            
+            const building = buildings.find(b => b.id === buildingId);
+            if (building) {
+                document.getElementById('buildingName').value = building.name;
+                document.getElementById('buildingAddress').value = building.address;
+                document.getElementById('buildingPhone').value = building.phone;
+                document.getElementById('currentBuildingName').textContent = building.name;
+            }
+        }
+
+        // Очистить форму здания
+        function clearBuildingForm() {
+            document.getElementById('buildingName').value = '';
+            document.getElementById('buildingAddress').value = '';
+            document.getElementById('buildingPhone').value = '';
+            document.getElementById('currentBuildingName').textContent = '—';
+            currentBuildingId = null;
+        }
+
+        // Добавить новое здание
+        function addNewBuilding() {
+            const newId = buildings.length > 0 ? Math.max(...buildings.map(b => b.id)) + 1 : 1;
+            currentBuildingId = newId;
+            
+            clearBuildingForm();
+            document.getElementById('buildingName').value = 'Новое здание';
+            document.getElementById('currentBuildingName').textContent = 'Новое здание';
+            
+            setTimeout(() => {
+                document.getElementById('buildingSelect').value = newId;
+            }, 100);
+        }
+
+        // Сохранить здание
+        function saveBuilding() {
+            if (!currentBuildingId) {
+                alert('Выберите или создайте здание');
+                return;
+            }
+            
+            let building = buildings.find(b => b.id === currentBuildingId);
+            
+            if (!building) {
+                building = {
+                    id: currentBuildingId,
+                    name: document.getElementById('buildingName').value,
+                    address: document.getElementById('buildingAddress').value,
+                    phone: document.getElementById('buildingPhone').value,
+                    coords: [43.790882, 131.944252],
+                    schedule: null,
+                    plan: null
+                };
+                buildings.push(building);
+            } else {
+                building.name = document.getElementById('buildingName').value;
+                building.address = document.getElementById('buildingAddress').value;
+                building.phone = document.getElementById('buildingPhone').value;
+            }
+            
+            saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+            
+            alert('✅ Здание сохранено!');
+        }
+
+        // Удалить здание
+        function deleteBuilding() {
+            if (!currentBuildingId) {
+                alert('Выберите здание для удаления');
+                return;
+            }
+            
+            if (!confirm(`Удалить здание "${document.getElementById('buildingName').value}"?`)) {
+                return;
+            }
+            
+            buildings = buildings.filter(b => b.id !== currentBuildingId);
+            saveBuildings();
+            renderBuildings();
+            renderBuildingButtons();
+            updateBuildingSelect();
+            clearBuildingForm();
+            
+            alert('✅ Здание удалено!');
+        }
+
+        // Загрузить план
+        function uploadPlan(file) {
+            if (!currentBuildingId) {
+                alert('Сначала выберите здание');
+                return;
+            }
+            
+            if (file && file.size > 5 * 1024 * 1024) {
+                alert('❌ Файл слишком большой! Максимум 5MB');
+                return;
+            }
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const building = buildings.find(b => b.id === currentBuildingId);
+                    if (building) {
+                        building.plan = e.target.result;
+                        saveBuildings();
+                        alert('✅ План кабинетов загружен!');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Загрузить расписание
+        function uploadSchedule(file) {
+            if (!currentBuildingId) {
+                alert('Сначала выберите здание');
+                return;
+            }
+            
+            if (file && file.size > 5 * 1024 * 1024) {
+                alert('❌ Файл слишком большой! Максимум 5MB');
+                return;
+            }
+            
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const building = buildings.find(b => b.id === currentBuildingId);
+                    if (building) {
+                        building.schedule = e.target.result;
+                        saveBuildings();
+                        alert('✅ Расписание загружено!');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Очистить план
+        function clearPlan() {
+            if (!currentBuildingId) {
+                alert('Сначала выберите здание');
+                return;
+            }
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            if (building) {
+                building.plan = null;
+                saveBuildings();
+                alert('✅ План кабинетов удалён!');
+            }
+        }
+
+        // Очистить расписание
+        function clearSchedule() {
+            if (!currentBuildingId) {
+                alert('Сначала выберите здание');
+                return;
+            }
+            
+            const building = buildings.find(b => b.id === currentBuildingId);
+            if (building) {
+                building.schedule = null;
+                saveBuildings();
+                alert('✅ Расписание удалено!');
+            }
+        }
+
+        // Экспорт данных
+        function exportData() {
+            const data = {
+                buildings: buildings,
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rzhdk_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert('✅ Данные экспортированы!');
+        }
+
+        // Импорт данных
+        function importData() {
+            document.getElementById('importFile').click();
+        }
+
+        function handleImport(file) {
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.buildings) {
+                            if (confirm('Заменить текущие данные импортированными?')) {
+                                buildings = data.buildings;
+                                saveBuildings();
+                                loadBuildings();
+                                alert('✅ Данные импортированы!');
+                            }
+                        } else {
+                            alert('❌ Неверный формат файла!');
+                        }
+                    } catch (error) {
+                        alert('❌ Ошибка чтения файла!');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Сброс данных
+        function resetData() {
+            if (confirm('❌ ВНИМАНИЕ! Это удалит все здания и загруженные файлы. Продолжить?')) {
+                localStorage.removeItem('rzhdk_buildings');
+                loadBuildings();
+                alert('✅ Все данные сброшены!');
+            }
+        }
+
+        // Показать шторку с деталями здания
+        function showBuildingSheet(building) {
+            document.getElementById('sheetBuildingName').textContent = building.name;
+            document.getElementById('sheetBuildingAddress').textContent = building.address;
+            document.getElementById('sheetBuildingPhone').textContent = `📞 ${building.phone}`;
+            
+            // План кабинетов
+            const planElement = document.getElementById('sheetBuildingPlan');
+            if (building.plan) {
+                planElement.innerHTML = `
+                    <img src="${building.plan}" 
+                         style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" 
+                         onclick="toggleImageZoom(this)">
+                    <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
+                        🔍 Нажми для увеличения
+                    </div>
+                `;
+            } else {
+                planElement.innerHTML = '🗺️ План кабинетов не загружен';
+            }
+            
+            // Расписание
+            const scheduleElement = document.getElementById('sheetBuildingSchedule');
+            if (building.schedule) {
+                scheduleElement.innerHTML = `
+                    <img src="${building.schedule}" 
+                         style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" 
+                         onclick="toggleImageZoom(this)">
+                    <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
+                        🔍 Нажми для увеличения
+                    </div>
+                `;
+            } else {
+                scheduleElement.innerHTML = '📅 Расписание не загружено';
+            }
+            
+            document.getElementById('buildingSheet').classList.add('active');
+        }
+
+        // Увеличение изображения
+        function toggleImageZoom(img) {
+            if (img.style.transform === 'scale(1.5)') {
+                img.style.transform = 'scale(1)';
+                img.style.cursor = 'zoom-in';
+            } else {
+                img.style.transform = 'scale(1.5)';
+                img.style.cursor = 'zoom-out';
+            }
+        }
+
+        // Закрыть шторку здания
+        function closeBuildingSheet() {
+            document.getElementById('buildingSheet').classList.remove('active');
+        }
+
+        // Админка
+        function showAdminPanel() {
+            document.getElementById('adminPanel').classList.add('active');
+        }
+
+        function hideAdminPanel() {
+            document.getElementById('adminPanel').classList.remove('active');
+            // Убираем параметр из URL когда закрываем админку
+            const url = new URL(window.location);
+            url.searchParams.delete('admin');
+            window.history.replaceState({}, '', url);
+        }
+
+        // Инициализация
+        ymaps.ready(initMap);
+    </script>
+</body>
+</html>
