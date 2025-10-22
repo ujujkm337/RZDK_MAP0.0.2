@@ -4,8 +4,8 @@
       "id": 1,
       "name": "Главный корпус",
       "coords": [43.790882, 131.944252],
-      "floors": [],
-      "groups": []
+      "floors": ["raspisanie.png"],
+      "groups": ["group1_schedule.jpg"]
     }
   ]
 }
