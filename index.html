@@ -20,7 +20,6 @@
             overflow: hidden;
         }
 
-        /* Карта */
         .map-container {
             width: 100%;
             height: 100vh;
@@ -32,7 +31,6 @@
             height: 100%;
         }
 
-        /* Нижняя шторка */
         .building-sheet {
             position: fixed;
             bottom: -100%;
@@ -60,7 +58,6 @@
             margin: 0 auto 20px auto;
         }
 
-        /* Кнопки зданий */
         .buildings-bar {
             position: fixed;
             bottom: 20px;
@@ -83,7 +80,6 @@
             box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
         }
 
-        /* Админка */
         .admin-panel {
             display: none;
             position: fixed;
@@ -155,7 +151,6 @@
             color: white;
         }
 
-        /* Мобильная адаптация */
         @media (max-width: 768px) {
             .buildings-bar {
                 bottom: 10px;
@@ -256,9 +251,22 @@
             margin: 5px 0;
             font-size: 14px;
         }
+
+        .sync-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #2c3e50;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
+    <div class="sync-status" id="syncStatus">🔄 Синхронизация...</div>
+
     <!-- Админ панель (изначально скрыта) -->
     <div class="admin-panel" id="adminPanel">
         <div class="admin-content">
@@ -352,8 +360,10 @@
 
     <script>
         const ADMIN_SECRET = "secret";
-        // Базовый URL для файлов на CDN (замените на ваш реальный URL)
-        const CDN_BASE_URL = "https://ujujkm337.github.io/RZDK_MAP0.0.2/files/";
+        // Базовый URL для файлов на GitHub
+        const CDN_BASE_URL = "https://ujujkm337.github.io/RZDK_MAP0.0.2/files";
+        // URL для данных (файл в вашем репозитории)
+        const DATA_FILE_URL = "https://ujujkm337.github.io/RZDK_MAP0.0.2/data.json";
         
         let map;
         let buildings = [];
@@ -362,7 +372,7 @@
         let placemarkMode = false;
         let tempPlacemark = null;
 
-        // Список доступных файлов на CDN (заполняется вручную)
+        // Список доступных файлов на GitHub
         const availableFiles = {
             floorPlans: [
                 "1floor.jpg",
@@ -388,6 +398,48 @@
             }
         ];
 
+        // Простая синхронизация через GitHub - только чтение
+        async function loadBuildingsFromGitHub() {
+            try {
+                // Добавляем timestamp чтобы избежать кеширования
+                const response = await fetch(DATA_FILE_URL + '?t=' + Date.now());
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    buildings = data.buildings || defaultBuildings;
+                    updateSyncStatus('✅ Данные загружены', 'success');
+                    return true;
+                } else {
+                    throw new Error('Ошибка загрузки');
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки с GitHub:', error);
+                // Загружаем из localStorage как резервный вариант
+                const saved = localStorage.getItem('rzhdk_buildings');
+                buildings = saved ? JSON.parse(saved) : defaultBuildings;
+                updateSyncStatus('⚠️ Используются локальные данные', 'warning');
+                return false;
+            }
+        }
+
+        function updateSyncStatus(message, type) {
+            const statusEl = document.getElementById('syncStatus');
+            statusEl.textContent = message;
+            
+            if (type === 'success') {
+                statusEl.style.background = '#27ae60';
+            } else if (type === 'error') {
+                statusEl.style.background = '#e74c3c';
+            } else if (type === 'warning') {
+                statusEl.style.background = '#f39c12';
+            }
+            
+            setTimeout(() => {
+                statusEl.style.background = '#2c3e50';
+                statusEl.textContent = '✅ Синхронизировано';
+            }, 3000);
+        }
+
         function checkAdminAccess() {
             const urlParams = new URLSearchParams(window.location.search);
             const adminParam = urlParams.get('admin');
@@ -398,34 +450,73 @@
             }
         }
 
-        function initMap() {
+        async function initMap() {
             map = new ymaps.Map('map', {
                 center: [43.790882, 131.944252],
                 zoom: 17,
                 controls: ['zoomControl', 'fullscreenControl']
             });
 
-            loadBuildings();
+            await loadBuildings();
             checkAdminAccess();
+            
+            // Автоматическая синхронизация каждые 30 секунд
+            setInterval(loadBuildings, 30000);
         }
 
-        function loadBuildings() {
-            const saved = localStorage.getItem('rzhdk_buildings');
-            buildings = saved ? JSON.parse(saved) : defaultBuildings;
-            
+        async function loadBuildings() {
+            await loadBuildingsFromGitHub();
             renderBuildings();
             renderBuildingButtons();
             updateBuildingSelect();
         }
 
         function saveBuildings() {
+            // Сохраняем только локально
             localStorage.setItem('rzhdk_buildings', JSON.stringify(buildings));
+            updateSyncStatus('💾 Сохранено локально', 'success');
+            
+            // Показываем инструкцию для ручного обновления на GitHub
+            if (isAdminMode) {
+                showGitHubInstructions();
+            }
+        }
+
+        function showGitHubInstructions() {
+            const dataStr = JSON.stringify({ buildings: buildings }, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const instruction = `
+📋 **ИНСТРУКЦИЯ ДЛЯ АДМИНА:**
+
+1. 📥 **Скачайте обновленные данные:**
+   <a href="${url}" download="data.json" style="color: #3498db;">Скачать data.json</a>
+
+2. 📁 **Загрузите в репозиторий GitHub:**
+   - Перейдите в ваш репозиторий на GitHub
+   - Нажмите "Add file" → "Upload files"
+   - Загрузите скачанный файл data.json
+   - Напишите комментарий коммита (например: "Обновление данных")
+   - Нажмите "Commit changes"
+
+3. 🔄 **Данные обновятся у всех пользователей через 30 секунд**
+
+💡 *Для автоматизации можно использовать GitHub Desktop или Git команды*
+            `;
+            
+            // Показываем инструкцию один раз при первом сохранении
+            if (!localStorage.getItem('instruction_shown')) {
+                setTimeout(() => {
+                    alert(instruction);
+                    localStorage.setItem('instruction_shown', 'true');
+                }, 1000);
+            }
         }
 
         function renderBuildings() {
             map.geoObjects.removeAll();
             
-            // В режиме админки не показываем метки
             if (isAdminMode) return;
             
             buildings.forEach(building => {
@@ -508,12 +599,10 @@
             
             placemarkMode = true;
             
-            // Удаляем старую временную метку
             if (tempPlacemark) {
                 map.geoObjects.remove(tempPlacemark);
             }
             
-            // Создаем временную метку
             tempPlacemark = new ymaps.Placemark(map.getCenter(), {}, {
                 preset: 'islands#redIcon',
                 draggable: true
@@ -521,7 +610,6 @@
             
             map.geoObjects.add(tempPlacemark);
             
-            // Обновляем координаты при перемещении
             tempPlacemark.events.add('dragend', function() {
                 const coords = tempPlacemark.geometry.getCoordinates();
                 document.getElementById('coordsDisplay').textContent = `Координаты: ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
@@ -534,7 +622,6 @@
             const newId = buildings.length > 0 ? Math.max(...buildings.map(b => b.id)) + 1 : 1;
             currentBuildingId = newId;
             
-            // Создаем новое здание сразу
             const newBuilding = {
                 id: newId,
                 name: 'Новое здание',
@@ -544,13 +631,11 @@
             };
             buildings.push(newBuilding);
             
-            // Обновляем интерфейс
             document.getElementById('buildingName').value = newBuilding.name;
             document.getElementById('currentBuildingName').textContent = newBuilding.name;
             document.getElementById('coordsDisplay').textContent = `Координаты: ${newBuilding.coords[0].toFixed(6)}, ${newBuilding.coords[1].toFixed(6)}`;
             document.getElementById('buildingDetails').style.display = 'block';
             
-            // Обновляем селект
             updateBuildingSelect();
             document.getElementById('buildingSelect').value = newId;
             
@@ -569,7 +654,6 @@
             let building = buildings.find(b => b.id === currentBuildingId);
             let coords;
             
-            // Получаем координаты из временной метки или используем текущие
             if (tempPlacemark) {
                 coords = tempPlacemark.geometry.getCoordinates();
                 map.geoObjects.remove(tempPlacemark);
@@ -588,11 +672,8 @@
             document.getElementById('coordsDisplay').textContent = `Координаты: ${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
             
             saveBuildings();
-            renderBuildings();
-            renderBuildingButtons();
-            updateBuildingSelect();
             
-            alert('✅ Здание сохранено!');
+            alert('✅ Здание сохранено! Не забудьте обновить данные на GitHub.');
             placemarkMode = false;
         }
 
@@ -608,12 +689,10 @@
             
             buildings = buildings.filter(b => b.id !== currentBuildingId);
             saveBuildings();
-            renderBuildings();
-            renderBuildingButtons();
             updateBuildingSelect();
             clearBuildingForm();
             
-            alert('✅ Здание удалено!');
+            alert('✅ Здание удалено! Не забудьте обновить данные на GitHub.');
         }
 
         function addFloor() {
@@ -787,7 +866,6 @@
         function showBuildingSheet(building) {
             document.getElementById('sheetBuildingName').textContent = building.name;
             
-            // Рендерим этажи для пользователя
             const userFloorsList = document.getElementById('userFloorsList');
             userFloorsList.innerHTML = '';
             
@@ -808,7 +886,6 @@
                 userFloorsList.appendChild(floorItem);
             });
             
-            // Рендерим группы для пользователя
             const userGroupsList = document.getElementById('userGroupsList');
             userGroupsList.innerHTML = '';
             
@@ -855,11 +932,10 @@
             const url = new URL(window.location);
             url.searchParams.delete('admin');
             window.history.replaceState({}, '', url);
-            // Перезагружаем здания чтобы скрыть метки
             loadBuildings();
         }
 
         ymaps.ready(initMap);
     </script>
 </body>
-    </html>
+</html>
