@@ -145,19 +145,14 @@
             color: white;
         }
 
-        .file-upload {
-            border: 2px dashed #7f8c8d;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
+        .file-select {
+            width: 100%;
+            padding: 12px;
             margin: 10px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .file-upload:hover {
-            border-color: #3498db;
-            background: rgba(52, 152, 219, 0.1);
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            background: #34495e;
+            color: white;
         }
 
         /* Мобильная адаптация */
@@ -252,6 +247,14 @@
             margin: 10px 0;
             font-family: monospace;
             text-align: center;
+        }
+
+        .file-info {
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 6px;
+            margin: 5px 0;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -349,12 +352,31 @@
 
     <script>
         const ADMIN_SECRET = "secret";
+        // Базовый URL для файлов на CDN (замените на ваш реальный URL)
+        const CDN_BASE_URL = "https://ваш-домен.kdhab.ru/files/";
+        
         let map;
         let buildings = [];
         let currentBuildingId = null;
         let isAdminMode = false;
         let placemarkMode = false;
         let tempPlacemark = null;
+
+        // Список доступных файлов на CDN (заполняется вручную)
+        const availableFiles = {
+            floorPlans: [
+                "1floor.jpg",
+                "2floor.jpg", 
+                "3floor.jpg",
+                "main_building.jpg"
+            ],
+            schedules: [
+                "group1_schedule.jpg",
+                "group2_schedule.jpg",
+                "music_schedule.jpg",
+                "dance_schedule.jpg"
+            ]
+        };
 
         const defaultBuildings = [
             {
@@ -512,14 +534,30 @@
             const newId = buildings.length > 0 ? Math.max(...buildings.map(b => b.id)) + 1 : 1;
             currentBuildingId = newId;
             
-            clearBuildingForm();
-            document.getElementById('buildingName').value = 'Новое здание';
-            document.getElementById('currentBuildingName').textContent = 'Новое здание';
+            // Создаем новое здание сразу
+            const newBuilding = {
+                id: newId,
+                name: 'Новое здание',
+                coords: map.getCenter(),
+                floors: [],
+                groups: []
+            };
+            buildings.push(newBuilding);
+            
+            // Обновляем интерфейс
+            document.getElementById('buildingName').value = newBuilding.name;
+            document.getElementById('currentBuildingName').textContent = newBuilding.name;
+            document.getElementById('coordsDisplay').textContent = `Координаты: ${newBuilding.coords[0].toFixed(6)}, ${newBuilding.coords[1].toFixed(6)}`;
             document.getElementById('buildingDetails').style.display = 'block';
             
-            setTimeout(() => {
-                document.getElementById('buildingSelect').value = newId;
-            }, 100);
+            // Обновляем селект
+            updateBuildingSelect();
+            document.getElementById('buildingSelect').value = newId;
+            
+            saveBuildings();
+            renderBuildingButtons();
+            
+            alert('✅ Новое здание создано! Теперь установите метку и сохраните.');
         }
 
         function saveBuilding() {
@@ -542,16 +580,7 @@
                 coords = map.getCenter();
             }
             
-            if (!building) {
-                building = {
-                    id: currentBuildingId,
-                    name: document.getElementById('buildingName').value,
-                    coords: coords,
-                    floors: [],
-                    groups: []
-                };
-                buildings.push(building);
-            } else {
+            if (building) {
                 building.name = document.getElementById('buildingName').value;
                 building.coords = coords;
             }
@@ -596,7 +625,7 @@
             building.floors.push({
                 number: floorNumber,
                 name: `Этаж ${floorNumber}`,
-                plan: null
+                planFile: null
             });
             
             saveBuildings();
@@ -610,15 +639,25 @@
             building.floors.forEach((floor, index) => {
                 const floorItem = document.createElement('div');
                 floorItem.className = 'floor-item';
+                
+                const selectOptions = availableFiles.floorPlans.map(file => 
+                    `<option value="${file}" ${floor.planFile === file ? 'selected' : ''}>${file}</option>`
+                ).join('');
+                
                 floorItem.innerHTML = `
                     <strong>${floor.name}</strong>
                     <div style="margin-top: 10px;">
                         <input type="text" value="${floor.name}" onchange="updateFloorName(${index}, this.value)" class="pin-input" style="font-size: 12px; padding: 8px;">
-                        <div class="file-upload" onclick="document.getElementById('floorPlan${index}').click()">
-                            ${floor.plan ? '✅ План загружен' : '🗺️ Загрузить план этажа'}
-                        </div>
-                        <input type="file" id="floorPlan${index}" style="display: none;" accept="image/*" onchange="uploadFloorPlan(${index}, this.files[0])">
-                        <button class="btn" style="background: #e74c3c; padding: 8px; margin-top: 5px;" onclick="deleteFloor(${index})">❌ Удалить</button>
+                        <select class="file-select" onchange="updateFloorPlan(${index}, this.value)">
+                            <option value="">-- Выберите план этажа --</option>
+                            ${selectOptions}
+                        </select>
+                        ${floor.planFile ? `
+                            <div class="file-info">
+                                ✅ Выбран файл: ${floor.planFile}
+                            </div>
+                        ` : ''}
+                        <button class="btn" style="background: #e74c3c; padding: 8px; margin-top: 5px;" onclick="deleteFloor(${index})">❌ Удалить этаж</button>
                     </div>
                 `;
                 floorsList.appendChild(floorItem);
@@ -633,24 +672,16 @@
             saveBuildings();
         }
 
-        function uploadFloorPlan(floorIndex, file) {
+        function updateFloorPlan(floorIndex, fileName) {
             if (!currentBuildingId) return;
             
-            if (file && file.size > 5 * 1024 * 1024) {
-                alert('❌ Файл слишком большой! Максимум 5MB');
-                return;
-            }
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.floors[floorIndex].planFile = fileName || null;
+            saveBuildings();
+            renderFloors(building);
             
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const building = buildings.find(b => b.id === currentBuildingId);
-                    building.floors[floorIndex].plan = e.target.result;
-                    saveBuildings();
-                    renderFloors(building);
-                    alert('✅ План этажа загружен!');
-                };
-                reader.readAsDataURL(file);
+            if (fileName) {
+                alert('✅ План этажа установлен!');
             }
         }
 
@@ -676,7 +707,7 @@
             
             building.groups.push({
                 name: groupName,
-                schedule: null
+                scheduleFile: null
             });
             
             document.getElementById('newGroupName').value = '';
@@ -691,38 +722,40 @@
             building.groups.forEach((group, index) => {
                 const groupItem = document.createElement('div');
                 groupItem.className = 'group-item';
+                
+                const selectOptions = availableFiles.schedules.map(file => 
+                    `<option value="${file}" ${group.scheduleFile === file ? 'selected' : ''}>${file}</option>`
+                ).join('');
+                
                 groupItem.innerHTML = `
                     <div class="group-header">
                         <strong>${group.name}</strong>
                         <button class="btn" style="background: #e74c3c; padding: 5px 10px;" onclick="deleteGroup(${index})">❌</button>
                     </div>
-                    <div class="file-upload" onclick="document.getElementById('groupSchedule${index}').click()">
-                        ${group.schedule ? '✅ Расписание загружено' : '📅 Загрузить расписание'}
-                    </div>
-                    <input type="file" id="groupSchedule${index}" style="display: none;" accept="image/*" onchange="uploadGroupSchedule(${index}, this.files[0])">
+                    <select class="file-select" onchange="updateGroupSchedule(${index}, this.value)">
+                        <option value="">-- Выберите расписание --</option>
+                        ${selectOptions}
+                    </select>
+                    ${group.scheduleFile ? `
+                        <div class="file-info">
+                            ✅ Выбран файл: ${group.scheduleFile}
+                        </div>
+                    ` : ''}
                 `;
                 groupsList.appendChild(groupItem);
             });
         }
 
-        function uploadGroupSchedule(groupIndex, file) {
+        function updateGroupSchedule(groupIndex, fileName) {
             if (!currentBuildingId) return;
             
-            if (file && file.size > 5 * 1024 * 1024) {
-                alert('❌ Файл слишком большой! Максимум 5MB');
-                return;
-            }
+            const building = buildings.find(b => b.id === currentBuildingId);
+            building.groups[groupIndex].scheduleFile = fileName || null;
+            saveBuildings();
+            renderGroups(building);
             
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const building = buildings.find(b => b.id === currentBuildingId);
-                    building.groups[groupIndex].schedule = e.target.result;
-                    saveBuildings();
-                    renderGroups(building);
-                    alert('✅ Расписание загружено!');
-                };
-                reader.readAsDataURL(file);
+            if (fileName) {
+                alert('✅ Расписание установлено!');
             }
         }
 
@@ -763,9 +796,9 @@
                 floorItem.className = 'floor-item';
                 floorItem.innerHTML = `
                     <strong>${floor.name}</strong>
-                    ${floor.plan ? `
+                    ${floor.planFile ? `
                         <div class="building-image">
-                            <img src="${floor.plan}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)">
+                            <img src="${CDN_BASE_URL}${floor.planFile}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="План ${floor.name}">
                             <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
                                 🔍 Нажми для увеличения
                             </div>
@@ -784,9 +817,9 @@
                 groupItem.className = 'group-item';
                 groupItem.innerHTML = `
                     <strong>${group.name}</strong>
-                    ${group.schedule ? `
+                    ${group.scheduleFile ? `
                         <div class="building-image">
-                            <img src="${group.schedule}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)">
+                            <img src="${CDN_BASE_URL}${group.scheduleFile}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" onclick="toggleImageZoom(this)" alt="Расписание ${group.name}">
                             <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 5px; font-size: 12px;">
                                 🔍 Нажми для увеличения
                             </div>
@@ -829,4 +862,4 @@
         ymaps.ready(initMap);
     </script>
 </body>
-</html>
+    </html>
